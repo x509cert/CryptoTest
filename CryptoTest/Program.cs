@@ -1,20 +1,19 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
+using System.Data;
+using Microsoft.Data.SqlClient;
 using Azure.Identity;
-using Azure.Security.KeyVault.Secrets;
 using Microsoft.Data.Encryption.Cryptography;
 using Microsoft.Data.Encryption.Cryptography.Serializers;
+using Azure.Core;
 using Microsoft.Data.Encryption.AzureKeyVaultProvider;
 
+#region Setup (Azure login, AKV and crypto settings)
 // Use this VM's Managed Service Identity
 var creds = new DefaultAzureCredential();
 
 // Get the AKV URL from the VM metadata
 var kvUri = await SupportKeyVault.GetKeyVaultUrl();
-
-// Create an AKV client
-var client = new SecretClient(new Uri(kvUri), creds);
 
 // Get the key from AKV
 EncryptionKeyStoreProvider azureKeyProvider = new AzureKeyVaultKeyStoreProvider(creds);
@@ -28,26 +27,76 @@ var encryptionSettings = new EncryptionSettings<string>(
     serializer: StandardSerializerFactory.Default.GetDefaultSerializer<string>()
 );
 
-// get the data from a plaintext CSV file and build an array of characters
-string[] lotrCharacters = File.ReadAllLines(@"c:\\lotr\\lotr.csv");
+#endregion
 
-// Connect to Azure SQL using the VM creds
-var sql = new SupportSQL(creds);
-sql.Connect();
+#region Read from CSV File and built up the DataTable
+// read all entries from the CSV file, and encrypt the last element (SSN)
+var records = File.ReadAllLines(@"c:\\lotr\\lotr.csv");
+DataTable dt = new DataTable();
 
-// read all entries from the CSV file, skip the first line because that's the column headings
-for (int i=1; i < lotrCharacters.Length; i++)
+for (int i = 0; i < records.Length; i++)
 {
-    string[] elem = lotrCharacters[i].Split(',');
-    sql.Insert(
-        elem[0],    // name 
-        elem[1],    // location 
-        elem[2]);   // ssn
+    string[] elem = records[i].Split(',');
+    if (elem.Length <= 1) break;
+
+    if (i == 0) //headers
+    {
+        dt.Columns.Add(elem[0], typeof(string));
+        dt.Columns.Add(elem[1], typeof(string));
+        dt.Columns.Add(elem[2], typeof(Byte[]));
+    }
+    else
+    {
+        dt.Rows.Add();
+        dt.Rows[i - 1].SetField("name", elem[0]);
+        dt.Rows[i - 1].SetField("location", elem[1]);
+        dt.Rows[i - 1].SetField("ssn", elem[2].Encrypt(encryptionSettings));
+    }
 }
 
-sql.Close();
+dt.AcceptChanges();
 
-string plaintextString = "This is a secret message";
-var ciph = plaintextString.Encrypt(encryptionSettings);
-var plain = ciph.Decrypt<string>(encryptionSettings);
-Console.Write(plain);
+#endregion
+
+#region SQL
+
+var connectionString = "Data Source=sql-cryptotest.database.windows.net; Initial Catalog=LoTR;Column Encryption Setting=enabled";
+using (var connection = new SqlConnection(connectionString))
+{
+    var token = creds.GetToken(
+            new TokenRequestContext(
+                new[] { "https://database.windows.net/.default" })).Token;
+
+    connection.AccessToken = token;
+
+    connection.Open();
+
+    using (var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.AllowEncryptedValueModifications, null))
+    {
+        string[] dbColumns = { "name", "location", "ssn" };
+
+        foreach (var column in dbColumns)
+            bulkCopy.ColumnMappings.Add(column, column);
+
+        bulkCopy.DestinationTableName = "[dbo].[Peoples2]";
+
+        bulkCopy.WriteToServer(dt);
+    }
+}
+
+
+//// Connect to Azure SQL using the VM creds
+//var sql = new SupportSQL(creds);
+//sql.Connect();
+//sql.BulkCopy(encryptedRecords.ToString());
+
+
+
+//sql.Close();
+
+#endregion
+
+//string plaintextString = "This is a secret message";
+//var ciph = plaintextString.Encrypt(encryptionSettings);
+//var plain = ciph.Decrypt<string>(encryptionSettings);
+//Console.Write(plain);

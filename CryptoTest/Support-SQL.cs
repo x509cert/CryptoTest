@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Net;
 using System.IO;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using Azure.Identity;
 using Azure.Core;
 
@@ -31,9 +31,14 @@ public class SupportSQL
         _conn.Open();
     }
 
+    public void BulkCopy(string[] encryptedRecords)
+    {
+
+    }
+
     public void Insert(string name, string location, string ssn)
     {
-        const string stmt = "INSERT into Characters VALUES (@name, @location, @ssn)";
+        const string stmt = "INSERT into Person VALUES (@name, @location, @ssn)";
         if (_conn is null) 
             throw new InvalidDataException("Connection is not set");
         
