@@ -13,13 +13,13 @@ public class SupportKeyVault
 {
     public static async Task<string> GetKeyVaultUrl()
     {
+        // this is the endpoint for the VM metadata
         const string ImdsServerEp = @"http://169.254.169.254/metadata/instance/compute/userData?api-version=2021-01-01&format=text";
+
         string jsonResult = string.Empty;
-        using (var httpClient = new HttpClient())
-        {
-            httpClient.DefaultRequestHeaders.Add("Metadata", "True");
-            jsonResult = await httpClient.GetStringAsync(ImdsServerEp);
-        }
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Metadata", "True");
+        jsonResult = await httpClient.GetStringAsync(ImdsServerEp);
 
         return Encoding.UTF8.GetString(System.Convert.FromBase64String(jsonResult));
     }
