@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CryptoTest": {
+      "commandName": "Project",
+      "commandLineArgs": "d"
+    }
+  }
+}
