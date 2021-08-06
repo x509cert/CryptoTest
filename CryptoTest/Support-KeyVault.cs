@@ -1,5 +1,4 @@
-﻿using System;
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -13,7 +12,8 @@ public class SupportKeyVault
 {
     public static async Task<string> GetKeyVaultUrl()
     {
-        const string ImdsServerEp = @"http://169.254.169.254/metadata/instance/compute/userData?api-version=2021-01-01&format=text";
+        const string ImdsServerEp = 
+            @"http://169.254.169.254/metadata/instance/compute/userData?api-version=2021-01-01&format=text";
         string jsonResult = string.Empty;
         using (var httpClient = new HttpClient())
         {

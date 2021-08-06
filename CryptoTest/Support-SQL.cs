@@ -20,7 +20,7 @@ public class SupportSQL
                     new[] { "https://database.windows.net/.default" })).Token;
 
         string connectionString = "Data Source=<AZURE-SQL-SERVERNAME>; Initial Catalog=<DATABASE>;";
-        SqlConnection conn = new SqlConnection(connectionString);
+        SqlConnection conn = new(connectionString);
         conn.AccessToken = oauth2TokenSql;
         conn.Open();
 
